@@ -66,3 +66,15 @@ class RewardResponse(BaseModel):
     active: bool
     created_at: datetime
     updated_at: datetime
+
+class RewardEligibilityResponse(BaseModel):
+    reward_id: UUID
+    reward_name: str
+    description: str | None
+    points_required: int
+    period: str
+
+    child_id: UUID
+    current_points: int
+
+    eligible: bool

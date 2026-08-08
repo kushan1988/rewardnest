@@ -10,6 +10,7 @@ from app.schemas.reward import (
     RewardCreate,
     RewardResponse,
     RewardUpdate,
+    RewardEligibilityResponse,
 )
 from app.services.reward_service import RewardService
 
@@ -128,3 +129,26 @@ def delete_reward(
         )
 
     return None
+
+@router.get(
+    "/children/{child_id}/eligibility",
+    response_model=list[RewardEligibilityResponse],
+)
+def get_child_reward_eligibility(
+    child_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = RewardService(db)
+
+    try:
+        return service.get_child_reward_eligibility(
+            parent_id=current_user.id,
+            child_id=child_id,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
