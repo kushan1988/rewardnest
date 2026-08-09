@@ -4,3 +4,4 @@ from .habit import Habit
 from .child_habit import ChildHabit
 from .point_transaction import PointTransaction
 from app.models.reward import Reward
+from app.models.reward_redemption import RewardRedemption

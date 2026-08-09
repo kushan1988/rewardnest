@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from uuid import UUID
 
 from sqlalchemy import func
@@ -13,7 +13,7 @@ class ScoreService:
     def __init__(self, db: Session):
         self.db = db
 
-    def _verify_child(
+    def validate_child(
         self,
         parent_id: UUID,
         child_id: UUID,
@@ -33,17 +33,35 @@ class ScoreService:
 
         return child
 
-    def get_today_score(
+    def get_total_points(
         self,
-        parent_id: UUID,
         child_id: UUID,
     ) -> int:
 
-        self._verify_child(parent_id, child_id)
+        total = (
+            self.db.query(
+                func.coalesce(
+                    func.sum(PointTransaction.points),
+                    0,
+                )
+            )
+            .filter(
+                PointTransaction.child_id == child_id
+            )
+            .scalar()
+        )
 
-        today = date.today()
+        return int(total or 0)
 
-        result = (
+    def get_daily_points(
+        self,
+        child_id: UUID,
+        reference_date: date | None = None,
+    ) -> int:
+
+        today = reference_date or date.today()
+
+        total = (
             self.db.query(
                 func.coalesce(
                     func.sum(PointTransaction.points),
@@ -57,24 +75,21 @@ class ScoreService:
             .scalar()
         )
 
-        return int(result or 0)
+        return int(total or 0)
 
-    def get_week_score(
+    def get_weekly_points(
         self,
-        parent_id: UUID,
         child_id: UUID,
+        reference_date: date | None = None,
     ) -> int:
 
-        self._verify_child(parent_id, child_id)
+        today = reference_date or date.today()
 
-        today = date.today()
-
-        # Monday = start of week
         week_start = today - timedelta(
             days=today.weekday()
         )
 
-        result = (
+        total = (
             self.db.query(
                 func.coalesce(
                     func.sum(PointTransaction.points),
@@ -89,21 +104,19 @@ class ScoreService:
             .scalar()
         )
 
-        return int(result or 0)
+        return int(total or 0)
 
-    def get_month_score(
+    def get_monthly_points(
         self,
-        parent_id: UUID,
         child_id: UUID,
+        reference_date: date | None = None,
     ) -> int:
 
-        self._verify_child(parent_id, child_id)
-
-        today = date.today()
+        today = reference_date or date.today()
 
         month_start = today.replace(day=1)
 
-        result = (
+        total = (
             self.db.query(
                 func.coalesce(
                     func.sum(PointTransaction.points),
@@ -118,58 +131,50 @@ class ScoreService:
             .scalar()
         )
 
-        return int(result or 0)
+        return int(total or 0)
 
-    def get_total_score(
+    def get_score_summary(
         self,
         parent_id: UUID,
         child_id: UUID,
-    ) -> int:
+    ) -> dict:
 
-        self._verify_child(parent_id, child_id)
-
-        result = (
-            self.db.query(
-                func.coalesce(
-                    func.sum(PointTransaction.points),
-                    0,
-                )
-            )
-            .filter(
-                PointTransaction.child_id == child_id,
-            )
-            .scalar()
+        self.validate_child(
+            parent_id=parent_id,
+            child_id=child_id,
         )
 
-        return int(result or 0)
+        return {
+            "child_id": child_id,
+            "daily_points": self.get_daily_points(
+                child_id
+            ),
+            "weekly_points": self.get_weekly_points(
+                child_id
+            ),
+            "monthly_points": self.get_monthly_points(
+                child_id
+            ),
+            "total_points": self.get_total_points(
+                child_id
+            ),
+        }
 
     def get_completion_count(
         self,
-        parent_id: UUID,
         child_id: UUID,
-        start_date: date | None = None,
-        end_date: date | None = None,
+        start_date: date,
+        end_date: date,
     ) -> int:
 
-        self._verify_child(parent_id, child_id)
-
-        query = (
-            self.db.query(
-                func.count(PointTransaction.id)
-            )
+        count = (
+            self.db.query(PointTransaction.id)
             .filter(
                 PointTransaction.child_id == child_id,
+                PointTransaction.completed_date >= start_date,
+                PointTransaction.completed_date <= end_date,
             )
+            .count()
         )
 
-        if start_date:
-            query = query.filter(
-                PointTransaction.completed_date >= start_date
-            )
-
-        if end_date:
-            query = query.filter(
-                PointTransaction.completed_date <= end_date
-            )
-
-        return int(query.scalar() or 0)
+        return count

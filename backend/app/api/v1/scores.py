@@ -30,21 +30,20 @@ def get_child_score(
 
     try:
         return ScoreResponse(
-            today=service.get_today_score(
-                current_user.id,
-                child_id,
+            today=service.get_daily_points(
+                child_id=child_id,
+                reference_date=date.today(),
             ),
-            week=service.get_week_score(
-                current_user.id,
-                child_id,
+            week=service.get_weekly_points(
+                child_id=child_id,
+                reference_date=date.today(),
             ),
-            month=service.get_month_score(
-                current_user.id,
-                child_id,
+            month=service.get_monthly_points(
+                child_id=child_id,
+                reference_date=date.today(),
             ),
-            total=service.get_total_score(
-                current_user.id,
-                child_id,
+            total=service.get_total_points(
+                child_id=child_id,
             ),
         )
 
@@ -66,7 +65,6 @@ def get_child_score_summary(
 ):
     service = ScoreService(db)
 
-    # Date ranges
     today = date.today()
 
     week_start = today - timedelta(
@@ -76,40 +74,41 @@ def get_child_score_summary(
     month_start = today.replace(day=1)
 
     try:
+        service.validate_child(
+            parent_id=current_user.id,
+            child_id=child_id,
+        )
+
         return ScoreSummaryResponse(
-            today=service.get_today_score(
-                current_user.id,
-                child_id,
+            today=service.get_daily_points(
+                child_id=child_id,
+                reference_date=today,
             ),
-            week=service.get_week_score(
-                current_user.id,
-                child_id,
+            week=service.get_weekly_points(
+                child_id=child_id,
+                reference_date=today,
             ),
-            month=service.get_month_score(
-                current_user.id,
-                child_id,
+            month=service.get_monthly_points(
+                child_id=child_id,
+                reference_date=today,
             ),
-            total=service.get_total_score(
-                current_user.id,
-                child_id,
+            total=service.get_total_points(
+                child_id=child_id,
             ),
             today_completions=service.get_completion_count(
-                current_user.id,
-                child_id,
-                today,
-                today,
+                child_id=child_id,
+                start_date=today,
+                end_date=today,
             ),
             week_completions=service.get_completion_count(
-                current_user.id,
-                child_id,
-                week_start,
-                today,
+                child_id=child_id,
+                start_date=week_start,
+                end_date=today,
             ),
             month_completions=service.get_completion_count(
-                current_user.id,
-                child_id,
-                month_start,
-                today,
+                child_id=child_id,
+                start_date=month_start,
+                end_date=today,
             ),
         )
 

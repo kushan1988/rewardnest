@@ -13,6 +13,7 @@ from app.schemas.reward import (
     RewardEligibilityResponse,
 )
 from app.services.reward_service import RewardService
+from app.schemas.reward_redemption import RewardRedemptionResponse
 
 
 router = APIRouter(
@@ -53,6 +54,75 @@ def get_rewards(
         parent_id=current_user.id,
     )
 
+@router.post(
+    "/{reward_id}/claim",
+    response_model=RewardRedemptionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def claim_reward(
+    reward_id: UUID,
+    child_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = RewardService(db)
+
+    try:
+        return service.claim_reward(
+            parent_id=current_user.id,
+            child_id=child_id,
+            reward_id=reward_id,
+        )
+
+    except ValueError as exc:
+        message = str(exc)
+
+        if message == "Reward not found":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=message,
+            )
+
+        if message == "Reward is not active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=message,
+            )
+
+        if message == "Child not found":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=message,
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
+        )
+
+
+@router.get(
+    "/children/{child_id}/redemptions",
+    response_model=list[RewardRedemptionResponse],
+)
+def get_child_redemptions(
+    child_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = RewardService(db)
+
+    try:
+        return service.get_child_redemptions(
+            parent_id=current_user.id,
+            child_id=child_id,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
 
 @router.get(
     "/{reward_id}",

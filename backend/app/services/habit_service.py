@@ -123,8 +123,13 @@ class HabitService:
         parent_id: UUID,
         child_id: UUID,
         habit_id: UUID,
-    ) -> ChildHabit:
+        points: int,
+    ):
 
+        if points <= 0:
+            raise ValueError("Points must be greater than zero")
+
+        # Verify child belongs to parent
         child = (
             self.db.query(Child)
             .filter(
@@ -136,18 +141,21 @@ class HabitService:
 
         if not child:
             raise ValueError("Child not found")
-        
+
         # Verify habit belongs to parent
-        habit = self.get_habit(
-            parent_id=parent_id,
-            habit_id=habit_id,
+        habit = (
+            self.db.query(Habit)
+            .filter(
+                Habit.id == habit_id,
+                Habit.parent_id == parent_id,
+            )
+            .first()
         )
 
         if not habit:
             raise ValueError("Habit not found")
 
-        # Look for an existing assignment,
-        # whether active or inactive.
+        # Check existing assignment
         existing = (
             self.db.query(ChildHabit)
             .filter(
@@ -158,23 +166,26 @@ class HabitService:
         )
 
         if existing:
-            # Already active → don't create duplicate
+
             if existing.active:
                 raise ValueError(
                     "Habit is already assigned to this child"
                 )
-            # Previously assigned but deactivated → reactivate
+
+            # Reactivate existing assignment
             existing.active = True
+            existing.points = points
 
             self.db.commit()
             self.db.refresh(existing)
 
             return existing
 
-        # No previous assignment → create new one
+        # Create new assignment
         child_habit = ChildHabit(
             child_id=child_id,
             habit_id=habit_id,
+            points=points,
             active=True,
         )
 

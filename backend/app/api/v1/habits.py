@@ -160,6 +160,7 @@ def assign_habit(
             parent_id=current_user.id,
             habit_id=habit_id,
             child_id=data.child_id,
+            points=data.points,
         )
 
     except ValueError as exc:

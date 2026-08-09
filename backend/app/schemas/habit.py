@@ -26,7 +26,7 @@ class HabitResponse(BaseModel):
 
 class ChildHabitCreate(BaseModel):
     child_id: UUID
-    points: int = Field(..., ge=1, le=1000)
+    points: int = Field(gt=0, description="Points must be greater than 0")
 
 
 class ChildHabitResponse(BaseModel):
