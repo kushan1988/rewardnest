@@ -144,26 +144,14 @@ class RewardService:
             .all()
         )
 
-        weekly_points = score_service.get_weekly_points(
-            child_id
-        )
-
-        monthly_points = score_service.get_monthly_points(
-            child_id
-        )
-
         results = []
 
         for reward in rewards:
 
-            if reward.period == "weekly":
-                current_points = weekly_points
-
-            elif reward.period == "monthly":
-                current_points = monthly_points
-
-            else:
-                current_points = 0
+            available_points = self.get_available_points(
+                child_id=child_id,
+                reward=reward,
+            )
 
             results.append(
                 {
@@ -173,9 +161,9 @@ class RewardService:
                     "points_required": reward.points_required,
                     "period": reward.period,
                     "child_id": child_id,
-                    "current_points": current_points,
+                    "current_points": available_points,
                     "eligible": (
-                        current_points
+                        available_points
                         >= reward.points_required
                     ),
                 }
