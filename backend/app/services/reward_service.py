@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -337,6 +337,103 @@ class RewardService:
             )
             .filter(
                 RewardRedemption.child_id == child_id,
+                Reward.parent_id == parent_id,
+            )
+            .order_by(
+                RewardRedemption.requested_at.desc()
+            )
+            .all()
+        )
+
+    # Redemption Approval/Decline
+    def get_redemption(
+        self,
+        parent_id: UUID,
+        redemption_id: UUID,
+    ) -> RewardRedemption | None:
+
+        return (
+            self.db.query(RewardRedemption)
+            .join(
+                Reward,
+                Reward.id == RewardRedemption.reward_id,
+            )
+            .filter(
+                RewardRedemption.id == redemption_id,
+                Reward.parent_id == parent_id,
+            )
+            .first()
+        )
+
+
+    def approve_redemption(
+        self,
+        parent_id: UUID,
+        redemption_id: UUID,
+    ) -> RewardRedemption:
+
+        redemption = self.get_redemption(
+            parent_id=parent_id,
+            redemption_id=redemption_id,
+        )
+
+        if not redemption:
+            raise ValueError("Redemption not found")
+
+        if redemption.status != "pending":
+            raise ValueError(
+                f"Redemption is already {redemption.status}"
+            )
+
+        redemption.status = "approved"
+        redemption.approved_at = datetime.now(timezone.utc)
+
+        self.db.commit()
+        self.db.refresh(redemption)
+
+        return redemption
+
+
+    def reject_redemption(
+        self,
+        parent_id: UUID,
+        redemption_id: UUID,
+    ) -> RewardRedemption:
+
+        redemption = self.get_redemption(
+            parent_id=parent_id,
+            redemption_id=redemption_id,
+        )
+
+        if not redemption:
+            raise ValueError("Redemption not found")
+
+        if redemption.status != "pending":
+            raise ValueError(
+                f"Redemption is already {redemption.status}"
+            )
+
+        redemption.status = "rejected"
+        redemption.approved_at = None
+
+        self.db.commit()
+        self.db.refresh(redemption)
+
+        return redemption
+
+
+    def get_redemptions(
+        self,
+        parent_id: UUID,
+    ) -> list[RewardRedemption]:
+
+        return (
+            self.db.query(RewardRedemption)
+            .join(
+                Reward,
+                Reward.id == RewardRedemption.reward_id,
+            )
+            .filter(
                 Reward.parent_id == parent_id,
             )
             .order_by(

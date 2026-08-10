@@ -125,6 +125,84 @@ def get_child_redemptions(
         )
 
 @router.get(
+    "/redemptions",
+    response_model=list[RewardRedemptionResponse],
+)
+def get_redemptions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = RewardService(db)
+
+    return service.get_redemptions(
+        parent_id=current_user.id,
+    )
+
+
+@router.post(
+    "/redemptions/{redemption_id}/approve",
+    response_model=RewardRedemptionResponse,
+)
+def approve_redemption(
+    redemption_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = RewardService(db)
+
+    try:
+        return service.approve_redemption(
+            parent_id=current_user.id,
+            redemption_id=redemption_id,
+        )
+
+    except ValueError as exc:
+        message = str(exc)
+
+        if message == "Redemption not found":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=message,
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
+        )
+
+
+@router.post(
+    "/redemptions/{redemption_id}/reject",
+    response_model=RewardRedemptionResponse,
+)
+def reject_redemption(
+    redemption_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = RewardService(db)
+
+    try:
+        return service.reject_redemption(
+            parent_id=current_user.id,
+            redemption_id=redemption_id,
+        )
+
+    except ValueError as exc:
+        message = str(exc)
+
+        if message == "Redemption not found":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=message,
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
+        )
+
+@router.get(
     "/{reward_id}",
     response_model=RewardResponse,
 )
