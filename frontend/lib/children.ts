@@ -26,6 +26,12 @@ export async function getChildren(): Promise<Child[]> {
   return apiFetchAuth<Child[]>("/children");
 }
 
+export async function getChild(
+  childId: string
+): Promise<Child> {
+  return apiFetchAuth<Child>(`/children/${childId}`);
+}
+
 export async function createChild(
   data: ChildCreate
 ): Promise<Child> {

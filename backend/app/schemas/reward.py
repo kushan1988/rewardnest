@@ -78,3 +78,4 @@ class RewardEligibilityResponse(BaseModel):
     current_points: int
 
     eligible: bool
+    pending: bool

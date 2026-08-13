@@ -153,6 +153,18 @@ class RewardService:
                 reward=reward,
             )
 
+            pending_redemption = (
+                self.db.query(RewardRedemption)
+                .filter(
+                    RewardRedemption.child_id == child_id,
+                    RewardRedemption.reward_id == reward.id,
+                    RewardRedemption.status == "pending",
+                )
+                .first()
+            )
+
+            has_pending_claim = pending_redemption is not None
+
             results.append(
                 {
                     "reward_id": reward.id,
@@ -163,55 +175,16 @@ class RewardService:
                     "child_id": child_id,
                     "current_points": available_points,
                     "eligible": (
-                        available_points
-                        >= reward.points_required
+                        available_points >= reward.points_required
+                        and not has_pending_claim
                     ),
+                    "pending": has_pending_claim,
                 }
             )
 
         return results
 
     # Rewards Redemption
-    def get_available_points(
-        self,
-        child_id: UUID,
-        reward: Reward,
-    ) -> int:
-
-        score_service = ScoreService(self.db)
-
-        if reward.period == "weekly":
-            earned_points = score_service.get_weekly_points(
-                child_id
-            )
-        else:
-            earned_points = score_service.get_monthly_points(
-                child_id
-            )
-
-        redeemed_points = (
-            self.db.query(
-                RewardRedemption.points_spent
-            )
-            .filter(
-                RewardRedemption.child_id == child_id,
-                RewardRedemption.reward_id == reward.id,
-                RewardRedemption.status.in_(
-                    ["pending", "approved"]
-                ),
-            )
-            .all()
-        )
-
-        reserved_points = sum(
-            points[0] for points in redeemed_points
-        )
-
-        return max(
-            earned_points - reserved_points,
-            0,
-        )
-
     def get_available_points(
         self,
         child_id: UUID,
@@ -289,6 +262,21 @@ class RewardService:
 
         if not reward.active:
             raise ValueError("Reward is not active")
+
+        existing_pending_redemption = (
+            self.db.query(RewardRedemption)
+            .filter(
+                RewardRedemption.child_id == child_id,
+                RewardRedemption.reward_id == reward.id,
+                RewardRedemption.status == "pending",
+            )
+            .first()
+        )
+
+        if existing_pending_redemption:
+            raise ValueError(
+                "This reward has already been requested and is awaiting approval"
+            )
 
         available_points = self.get_available_points(
             child_id=child_id,

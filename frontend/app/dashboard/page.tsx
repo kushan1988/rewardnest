@@ -4,12 +4,23 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredUser, logout, User } from "@/lib/auth";
 import { getChildren, Child } from "@/lib/children";
+import {
+  getScoreSummary,
+  getRewardEligibility,
+  ScoreSummary,
+} from "@/lib/scores";
 
 export default function DashboardPage() {
   const router = useRouter();
 
   const [user, setUser] = useState<User | null>(null);
   const [children, setChildren] = useState<Child[]>([]);
+  const [scoreSummaries, setScoreSummaries] = useState<
+    Record<string, ScoreSummary>
+  >({});
+  const [eligibleRewards, setEligibleRewards] = useState<
+    Record<string, number>
+  >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -26,12 +37,34 @@ export default function DashboardPage() {
     async function loadChildren() {
       try {
         const data = await getChildren();
+
         setChildren(data);
+
+        const summaries: Record<string, ScoreSummary> = {};
+        const rewards: Record<string, number> = {};
+
+        await Promise.all(
+          data.map(async (child) => {
+            const [summary, eligibility] = await Promise.all([
+              getScoreSummary(child.id),
+              getRewardEligibility(child.id),
+            ]);
+
+            summaries[child.id] = summary;
+
+            rewards[child.id] = eligibility.filter(
+              (reward) => reward.eligible,
+            ).length;
+          }),
+        );
+
+        setScoreSummaries(summaries);
+        setEligibleRewards(rewards);
       } catch (err) {
         setError(
           err instanceof Error
             ? err.message
-            : "Unable to load children.",
+            : "Unable to load dashboard data.",
         );
       } finally {
         setLoading(false);
@@ -89,6 +122,13 @@ export default function DashboardPage() {
             </button>
 
             <button
+              onClick={() => router.push("/child-mode")}
+              className="w-full rounded-xl px-4 py-3 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+            >
+              🧒 Child Mode
+            </button>
+
+            <button
               onClick={() => router.push("/children")}
               className="w-full rounded-xl px-4 py-3 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-50"
             >
@@ -132,6 +172,30 @@ export default function DashboardPage() {
             <p className="mt-2 text-slate-500">
               Here's what's happening with your children.
             </p>
+            <div className="mt-6 flex flex-col gap-4 rounded-2xl bg-indigo-600 p-6 text-white sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-indigo-100">
+                  Time for your child?
+                </p>
+
+                <h2 className="mt-1 text-xl font-bold">
+                  Switch to Child Mode
+                </h2>
+
+                <p className="mt-2 max-w-xl text-sm text-indigo-100">
+                  Let your child view their progress, explore rewards, and claim
+                  rewards they have earned.
+                </p>
+              </div>
+
+              <button
+                onClick={() => router.push("/child-mode")}
+                disabled={loading || children.length === 0}
+                className="shrink-0 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                🧒 Enter Child Mode
+              </button>
+            </div>
           </div>
 
           {loading && (
@@ -230,14 +294,24 @@ export default function DashboardPage() {
                       View habits, score & rewards
                     </p>
 
-                    <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="mt-5 grid grid-cols-3 gap-3">
                       <div className="rounded-xl bg-slate-50 p-3">
                         <p className="text-xs text-slate-400">
                           This week
                         </p>
 
                         <p className="mt-1 font-bold text-slate-700">
-                          ⭐ —
+                          ⭐ {scoreSummaries[child.id]?.week ?? 0}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-xs text-slate-400">
+                          This month
+                        </p>
+
+                        <p className="mt-1 font-bold text-slate-700">
+                          📅 {scoreSummaries[child.id]?.month ?? 0}
                         </p>
                       </div>
 
@@ -247,7 +321,7 @@ export default function DashboardPage() {
                         </p>
 
                         <p className="mt-1 font-bold text-slate-700">
-                          🎁 —
+                          🎁 {eligibleRewards[child.id] ?? 0}
                         </p>
                       </div>
                     </div>
