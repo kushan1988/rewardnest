@@ -10,7 +10,14 @@ import {
     ScoreSummary,
     RewardEligibility,
 } from "@/lib/scores";
-
+import {
+    assignHabit,
+    ChildHabit,
+    deactivateChildHabit,
+    getChildHabits,
+    getHabits,
+    Habit,
+} from "@/lib/habits";
 export default function ChildDetailPage() {
     const router = useRouter();
     const params = useParams();
@@ -24,22 +31,35 @@ export default function ChildDetailPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
+    const [availableHabits, setAvailableHabits] = useState<Habit[]>([]);
+    const [childHabits, setChildHabits] = useState<ChildHabit[]>([]);
+
+    const [selectedHabitId, setSelectedHabitId] = useState("");
+    const [habitPoints, setHabitPoints] = useState(1);
+
+    const [assigningHabit, setAssigningHabit] = useState(false);
+    const [habitActionError, setHabitActionError] = useState("");
+
     useEffect(() => {
         async function loadChildData() {
             try {
                 setLoading(true);
                 setError("");
 
-                const [childData, scoreData, rewardData] =
+                const [childData, scoreData, rewardData, habitsData, childHabitsData,] =
                     await Promise.all([
                         getChild(childId),
                         getScoreSummary(childId),
                         getRewardEligibility(childId),
+                        getHabits(),
+                        getChildHabits(childId),
                     ]);
 
                 setChild(childData);
                 setScore(scoreData);
                 setRewards(rewardData);
+                setAvailableHabits(habitsData);
+                setChildHabits(childHabitsData);
             } catch (err) {
                 setError(
                     err instanceof Error
@@ -55,6 +75,76 @@ export default function ChildDetailPage() {
             loadChildData();
         }
     }, [childId]);
+
+    async function handleAssignHabit() {
+        if (!selectedHabitId) {
+            setHabitActionError("Please select a habit.");
+            return;
+        }
+
+        if (habitPoints <= 0) {
+            setHabitActionError(
+                "Points must be greater than 0.",
+            );
+            return;
+        }
+
+        try {
+            setAssigningHabit(true);
+            setHabitActionError("");
+
+            const assignment = await assignHabit(
+                selectedHabitId,
+                {
+                    child_id: childId,
+                    points: habitPoints,
+                },
+            );
+
+            setChildHabits((current) => [
+                ...current,
+                assignment,
+            ]);
+
+            setSelectedHabitId("");
+            setHabitPoints(1);
+        } catch (err) {
+            setHabitActionError(
+                err instanceof Error
+                    ? err.message
+                    : "Unable to assign habit.",
+            );
+        } finally {
+            setAssigningHabit(false);
+        }
+    }
+
+    async function handleDeactivateHabit(
+        childHabitId: string,
+    ) {
+        try {
+            setHabitActionError("");
+
+            await deactivateChildHabit(childHabitId);
+
+            setChildHabits((current) =>
+                current.map((assignment) =>
+                    assignment.id === childHabitId
+                        ? {
+                            ...assignment,
+                            active: false,
+                        }
+                        : assignment,
+                ),
+            );
+        } catch (err) {
+            setHabitActionError(
+                err instanceof Error
+                    ? err.message
+                    : "Unable to deactivate habit.",
+            );
+        }
+    }
 
     if (loading) {
         return (
@@ -198,6 +288,142 @@ export default function ChildDetailPage() {
                             icon="🏆"
                             subtitle={`${score.today_completions} today`}
                         />
+                    </div>
+                </section>
+
+                {/* Habits */}
+                <section className="mt-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+                    <div>
+                        <p className="text-sm font-bold uppercase tracking-wider text-indigo-600">
+                            HABITS
+                        </p>
+
+                        <h2 className="mt-2 text-2xl font-bold text-slate-900">
+                            Manage Habits
+                        </h2>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                            Assign habits and set the points your child can earn.
+                        </p>
+                    </div>
+
+                    {habitActionError && (
+                        <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {habitActionError}
+                        </div>
+                    )}
+
+                    {/* Assign habit */}
+                    <div className="mt-6 rounded-2xl bg-slate-50 p-5">
+                        <h3 className="font-bold text-slate-900">
+                            Assign a Habit
+                        </h3>
+
+                        <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_140px_auto]">
+                            <select
+                                value={selectedHabitId}
+                                onChange={(event) => {
+                                    setSelectedHabitId(event.target.value);
+                                    setHabitActionError("");
+                                }}
+                                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                            >
+                                <option value="">Select a habit</option>
+
+                                {availableHabits.map((habit) => (
+                                    <option key={habit.id} value={habit.id}>
+                                        {habit.name}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <input
+                                type="number"
+                                min="1"
+                                value={habitPoints}
+                                onChange={(event) =>
+                                    setHabitPoints(Number(event.target.value))
+                                }
+                                placeholder="Points"
+                                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                            />
+
+                            <button
+                                onClick={handleAssignHabit}
+                                disabled={assigningHabit}
+                                className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {assigningHabit ? "Assigning..." : "Assign Habit"}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Assigned habits */}
+                    <div className="mt-6">
+                        <h3 className="font-bold text-slate-900">
+                            Assigned Habits
+                        </h3>
+
+                        {childHabits.length === 0 ? (
+                            <p className="mt-3 text-sm text-slate-500">
+                                No habits have been assigned yet.
+                            </p>
+                        ) : (
+                            <div className="mt-4 space-y-3">
+                                {childHabits.map((assignment) => {
+                                    const habit = availableHabits.find(
+                                        (item) => item.id === assignment.habit_id,
+                                    );
+
+                                    return (
+                                        <div
+                                            key={assignment.id}
+                                            className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                        >
+                                            <div>
+                                                <div className="flex items-center gap-3">
+                                                    <h4 className="font-bold text-slate-900">
+                                                        {habit?.name ?? "Unknown Habit"}
+                                                    </h4>
+
+                                                    <span
+                                                        className={`rounded-full px-3 py-1 text-xs font-bold ${assignment.active
+                                                            ? "bg-green-100 text-green-700"
+                                                            : "bg-slate-100 text-slate-500"
+                                                            }`}
+                                                    >
+                                                        {assignment.active
+                                                            ? "Active"
+                                                            : "Inactive"}
+                                                    </span>
+                                                </div>
+
+                                                {habit?.description && (
+                                                    <p className="mt-1 text-sm text-slate-500">
+                                                        {habit.description}
+                                                    </p>
+                                                )}
+
+                                                <p className="mt-2 text-sm font-semibold text-indigo-600">
+                                                    {assignment.points} points per completion
+                                                </p>
+                                            </div>
+
+                                            {assignment.active && (
+                                                <button
+                                                    onClick={() =>
+                                                        handleDeactivateHabit(assignment.id)
+                                                    }
+                                                    className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                                                >
+                                                    Deactivate
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </section>
 
