@@ -105,13 +105,27 @@ class RewardService:
         reward_id: UUID,
     ) -> bool:
 
-        reward = self.get_reward(
-            parent_id,
-            reward_id,
+        reward = (
+            self.db.query(Reward)
+            .filter(
+                Reward.id == reward_id,
+                Reward.parent_id == parent_id,
+            )
+            .first()
         )
 
-        if not reward:
-            return False
+        redemption_exists = (
+            self.db.query(RewardRedemption)
+            .filter(
+                RewardRedemption.reward_id == reward_id,
+            )
+            .first()
+        )
+
+        if redemption_exists:
+            raise ValueError(
+                "This reward cannot be deleted because it has redemption history. You can deactivate it instead."
+            )
 
         self.db.delete(reward)
         self.db.commit()

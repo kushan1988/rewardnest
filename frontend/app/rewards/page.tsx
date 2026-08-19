@@ -171,7 +171,9 @@ export default function RewardsPage() {
 
   async function handleDelete(reward: Reward) {
     const confirmed = window.confirm(
-      `Delete "${reward.name}"? This action cannot be undone.`,
+      `Delete "${reward.name}"?\n\n` +
+      "Rewards with redemption history cannot be deleted. " +
+      "You can deactivate them instead.",
     );
 
     if (!confirmed) return;

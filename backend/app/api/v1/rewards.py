@@ -265,18 +265,25 @@ def delete_reward(
 ):
     service = RewardService(db)
 
-    deleted = service.delete_reward(
-        parent_id=current_user.id,
-        reward_id=reward_id,
-    )
-
-    if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Reward not found",
+    try:
+        deleted = service.delete_reward(
+            parent_id=current_user.id,
+            reward_id=reward_id,
         )
 
-    return None
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Reward not found",
+            )
+
+        return None
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
 
 @router.get(
     "/children/{child_id}/eligibility",
