@@ -42,7 +42,6 @@ class RewardService:
             self.db.query(Reward)
             .filter(
                 Reward.parent_id == parent_id,
-                Reward.active.is_(True),
             )
             .order_by(
                 Reward.points_required.asc()
